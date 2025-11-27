@@ -146,51 +146,64 @@ async def websocket_chat(websocket: WebSocket, system: RAGSystem = Depends(get_r
     await websocket.accept()
     logger.info("WebSocket connection established.")
     
-    # We need a unique temp file for this session
-    # Using .webm because browsers usually stream webm/opus
     temp_filename = f"ws_audio_{os.urandom(4).hex()}.webm"
     temp_file_path = os.path.join(config.DATA_DIR, temp_filename)
     
     file_handle = open(temp_file_path, "wb")
     
     try:
-        
         while True:
-            # Receive data: could be bytes (audio) or text (commands)
             data = await websocket.receive()
             
+            if data["type"] == "websocket.disconnect":
+                logger.info("WebSocket disconnected")
+                break
+
             if "bytes" in data:
-                # Append audio chunk to file
                 file_handle.write(data["bytes"])
                 
             elif "text" in data:
                 text_data = data["text"]
                 
-                # Client signals they are done talking
                 if text_data == "END":
-                    file_handle.close() # Finish writing
+                    file_handle.close()
                     logger.info(f"Audio received. Processing {temp_file_path}...")
                     
-                    # 1. Transcribe & Chat
                     try:
-                        # Re-use your existing logic
-                        response = system.ask_question_from_audio(temp_file_path)
+                        # 1. Transcribe
+                        transcribed_text = system.transcribe_audio(temp_file_path)
                         
-                        # Send back JSON response
-                        await websocket.send_json({
-                            "answer": response.get("answer"),
-                            "context": [
-                                {"page_content": doc.page_content, "metadata": doc.metadata}
-                                for doc in response.get("context", [])
-                            ]
-                        })
+                        if not transcribed_text:
+                            # Handle silence
+                            await websocket.send_json({
+                                "answer": "I could not hear any audio.", 
+                                "context": []
+                            })
+                        else:
+                            # 2. Send Query to Frontend IMMEDIATELY
+                            await websocket.send_json({
+                                "query": transcribed_text
+                            })
+                            
+                            # 3. Then Process the Answer
+                            response = system.ask_question(transcribed_text)
+                            
+                            # 4. Send Answer
+                            await websocket.send_json({
+                                "answer": response.get("answer"),
+                                "context": [
+                                    {"page_content": doc.page_content, "metadata": doc.metadata}
+                                    for doc in response.get("context", [])
+                                ]
+                            })
+                            
                     except Exception as e:
                         logger.error(f"Processing error: {e}")
-                        await websocket.send_json({"error": str(e)})
+                        if websocket.client_state.name == "CONNECTED":
+                            await websocket.send_json({"error": str(e)})
                     
-                    # Clean up and prepare for next query
+                    # Cleanup
                     os.remove(temp_file_path)
-                    # Re-open for next utterance if you want to keep connection alive
                     file_handle = open(temp_file_path, "wb") 
 
     except WebSocketDisconnect:
