@@ -5,6 +5,7 @@ from providers.llm import LLMProvider
 from providers.retriever import RetrieverProvider
 from providers.ingestor import Ingestor
 from providers.chain import ChainProvider
+from providers.stt import STTProvider
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,10 @@ class RAGSystem:
             self.llm,
             initial_retriever
         )
+
+        # 5. Init STT Provider
+        self.stt_provider = STTProvider(self.config)
+
         logger.info("RAG System initialized successfully.")
 
     def upload_document(self, file_path: str) -> int:
@@ -86,3 +91,17 @@ class RAGSystem:
         except Exception as e:
             logger.error(f"Error during chain invocation: {e}")
             raise
+    
+    def ask_question_from_audio(self, audio_file_path: str) -> dict:
+        """
+        Transcribes audio and then asks the question to the RAG chain.
+        """
+        logger.info(f"RAGSystem: Processing audio query from {audio_file_path}")
+        
+        transcribed_text = self.stt_provider.transcribe(audio_file_path)
+        logger.info(f"Transcribed Text: {transcribed_text}")
+        
+        if not transcribed_text:
+            return {"answer": "I could not hear any audio.", "context": []}
+
+        return self.ask_question(transcribed_text)
