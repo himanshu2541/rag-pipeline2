@@ -1,8 +1,8 @@
 import logging
 import os
 import shutil
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
-
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from models.chat import ChatQuery, ChatResponse
 from models.document import DocumentContext
 from models.upload import UploadResponse
@@ -20,6 +20,14 @@ app = FastAPI(
     title="RAG System",
     description="A RAG system with BM25 and Pinecone, built with FastAPI.",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 try:
@@ -132,6 +140,81 @@ async def chat(
             status_code=500, 
             detail=f"Error processing chat query: {e}"
         )
+    
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket, system: RAGSystem = Depends(get_rag_system)):
+    await websocket.accept()
+    logger.info("WebSocket connection established.")
+    
+    temp_filename = f"ws_audio_{os.urandom(4).hex()}.webm"
+    temp_file_path = os.path.join(config.DATA_DIR, temp_filename)
+    
+    file_handle = open(temp_file_path, "wb")
+    
+    try:
+        while True:
+            data = await websocket.receive()
+            
+            if data["type"] == "websocket.disconnect":
+                logger.info("WebSocket disconnected")
+                break
+
+            if "bytes" in data:
+                file_handle.write(data["bytes"])
+                
+            elif "text" in data:
+                text_data = data["text"]
+                
+                if text_data == "END":
+                    file_handle.close()
+                    logger.info(f"Audio received. Processing {temp_file_path}...")
+                    
+                    try:
+                        # 1. Transcribe
+                        transcribed_text = system.transcribe_audio(temp_file_path)
+                        
+                        if not transcribed_text:
+                            # Handle silence
+                            await websocket.send_json({
+                                "answer": "I could not hear any audio.", 
+                                "context": []
+                            })
+                        else:
+                            # 2. Send Query to Frontend IMMEDIATELY
+                            await websocket.send_json({
+                                "query": transcribed_text
+                            })
+                            
+                            # 3. Then Process the Answer
+                            response = system.ask_question(transcribed_text)
+                            
+                            # 4. Send Answer
+                            await websocket.send_json({
+                                "answer": response.get("answer"),
+                                "context": [
+                                    {"page_content": doc.page_content, "metadata": doc.metadata}
+                                    for doc in response.get("context", [])
+                                ]
+                            })
+                            
+                    except Exception as e:
+                        logger.error(f"Processing error: {e}")
+                        if websocket.client_state.name == "CONNECTED":
+                            await websocket.send_json({"error": str(e)})
+                    
+                    # Cleanup
+                    os.remove(temp_file_path)
+                    file_handle = open(temp_file_path, "wb") 
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+    finally:
+        if not file_handle.closed:
+            file_handle.close()
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 if __name__ == "__main__":
     import uvicorn

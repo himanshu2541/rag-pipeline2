@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.121.2",
+    "faster-whisper>=1.2.1",
     "huggingface-hub[hf-xet]>=0.36.0",
     "langchain>=1.0.5",
     "langchain-classic>=1.0.0",

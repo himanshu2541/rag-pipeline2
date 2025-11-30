@@ -15,6 +15,10 @@ class Config(BaseSettings):
     LLM_MODEL: str = "phi-3-mini-4k-instruct"
     LLM_BASE_URL: str = "http://localhost:1234/v1"
 
+    STT_MODEL_SIZE: str = "small"  # Options: tiny, base, small, medium, large-v3
+    STT_DEVICE: str = "cpu"      # "cuda" if GPU available, else "cpu"
+    STT_COMPUTE_TYPE: str = "int8" # "int8" for CPU speed, "float16" for GPU precision
+    
     # Pinecone Configuration
     PINECONE_API_KEY: str = ""
     PINECONE_INDEX_NAME: str = ""
