@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package rag_rpc;
+
+// Service 1: Speech to Text
+service Transcriber {
+  rpc Transcribe (AudioRequest) returns (TranscriptionResponse);
+}
+
+message AudioRequest {
+  bytes audio_content = 1;
+  string filename = 2;
+}
+
+message TranscriptionResponse {
+  string text = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+// Service 2: Ingestion
+service Ingestor {
+  rpc IngestDocument (IngestRequest) returns (IngestResponse);
+}
+
+message IngestRequest {
+  string file_path = 1;     // Path to file in shared storage (e.g. S3 or volume)
+  string document_id = 2;
+}
+
+message IngestResponse {
+  int32 chunks_processed = 1;
+  string status = 2;
+  string error_message = 3;
+}

@@ -1,25 +1,8 @@
 [project]
-name = "doc-chat"
+name = "rag-pipeline-root"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi>=0.121.2",
-    "faster-whisper>=1.2.1",
-    "huggingface-hub[hf-xet]>=0.36.0",
-    "langchain>=1.0.5",
-    "langchain-classic>=1.0.0",
-    "langchain-community>=0.4.1",
-    "langchain-core>=1.0.4",
-    "langchain-huggingface>=1.0.1",
-    "langchain-openai>=1.0.2",
-    "langchain-pinecone>=0.2.13",
-    "pinecone-client>=6.0.0",
-    "pydantic-settings>=2.12.0",
-    "python-dotenv>=1.2.1",
-    "python-multipart>=0.0.20",
-    "rank-bm25>=0.2.2",
-    "sentence-transformers>=5.1.2",
-    "uvicorn[standard]>=0.38.0",
-]
+description = "RAG Pipeline Workspace Root"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["services/*", "shared"]
