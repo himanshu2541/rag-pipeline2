@@ -1,0 +1,15 @@
+[project]
+name = "ingestion-service"
+version = "0.1.0"
+description = "Document processing worker"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio-tools>=1.76.0",
+    "langchain-community>=0.4.1",
+    "langchain-text-splitters>=1.0.0",
+    "rag-shared",
+    "unstructured>=0.18.21",
+]
+
+[tool.uv.sources]
+rag-shared = { workspace = true }
